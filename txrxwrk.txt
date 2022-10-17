@@ -1,0 +1,191 @@
+/*
+ * File:   cc.c
+ * Author: admin
+ *
+ * Created on October 11, 2022, 11:25 AM
+ */
+
+// PIC18F458 Configuration Bit Settings
+
+// 'C' source line config statements
+
+
+#include "config.h"
+#define _XTAL_FREQ 20000000
+#define ENABLE 1
+#define DISABLE 0
+//declarations 
+unsigned int data;
+unsigned int act=0x89 ,ref;
+unsigned int addr;
+unsigned int msg;
+unsigned int actref[3];
+
+//unsigned int write(unsigned int, unsigned int);
+//unsigned int read(unsigned int);
+
+
+//system initialization
+void sysinit() {
+    INTCONbits.GIE = ENABLE;
+    INTCONbits.PEIE = ENABLE;
+}
+
+
+//CAN Initialization
+void caninit() {
+   TRISBbits.RB2 = DISABLE; //RB2 is for transmit
+    TRISBbits.RB3 = ENABLE; //RB3 is for receive
+     
+    CANCON |= 0x80;
+    
+    while (CANSTAT!=0x00) {
+        BRGCON1 = 0xC1;
+        BRGCON2 = 0xAE;
+        BRGCON3 = 0x45;
+        CIOCON = 0x02;
+        CANCON = 0x00;  
+    }
+}
+
+
+
+
+
+void act_speed_write(unsigned int data, unsigned char addr){
+    
+    EEDATA =data;
+    EEADR =addr;
+    EECON2=0x55;
+    EECON2=0xAA;
+    EECON1bits.WREN=ENABLE;
+    EECON1bits.WR=ENABLE;
+   
+}
+
+void ref_speed_write(unsigned int data, unsigned int addr){
+    
+    EEDATA =data;
+    EEADR =addr;
+    EECON2=0x55;
+    EECON2=0xAA;
+    EECON1bits.WREN=ENABLE;
+    EECON1bits.WR=ENABLE;
+}
+
+//unsigned int ref_speed_read(unsigned char addr){
+//    EECON1bits.RD=ENABLE;
+//    EEADR=0xF2;
+//    data=EEDATA;
+//    return data;
+//}
+//
+//unsigned int act_speed_read(unsigned char addr){
+//    EECON1bits.RD=ENABLE;
+//    EEADR=0xF1;
+//    data=EEDATA;
+//    EECON1bits.EEPGD=DISABLE;
+//    EECON1bits.CFGS=DISABLE;
+//    EECON1bits.RD=ENABLE;
+//    return data;
+//}
+
+
+void cantransmit(void) {
+    CANCON = 0x00;
+
+    TXB0SIDH = 0x14;
+    TXB0SIDL = 0x00;
+    TXB0DLC = 0x01;
+
+    TXB0D0 = act;
+//    TXB0D1 = 0x02;
+//    TXB0D2 = 0x03;
+//    TXB0D3 = 0x04;
+//    TXB0D4 = 0x05;
+//    TXB0D5 = 0x06;
+//    TXB0D6 = 0x07;
+//    TXB0D7 = 0x08;
+
+    TXB0CONbits.TXREQ = ENABLE;
+}
+
+
+
+
+
+ unsigned int rec_speed(){
+     CANCON = 0x00;
+      
+    RXB0SIDH = 0x014;
+    RXB0SIDL = 0x00;
+    RXB0DLC = 0x01;
+   
+     RXM0SIDH=0x14;
+    RXM0SIDL=0x00;
+    
+     RXF0SIDH=0x14;
+    RXF0SIDL=0x00;
+ 
+    ref =  RXB0D0; 
+      
+    RXB0CONbits.RXM0 = 0X01;
+
+    return ref;
+}
+
+
+
+
+ 
+ //switches
+ 
+
+
+//unsigned int CC(){
+//    TRISD=0;
+//    TRISB=0x02;
+//    RBPU=0;
+//    if(RB1==1){
+//    LD1=~RB1;
+//    ref_speed_write();
+//    }else if(RB1==0){
+//        LD1=~RB1;
+//    }
+//}
+      
+ 
+ void CC(){
+     TRISAbits.RA0=0;
+     TRISBbits.RB0=0;
+     
+     if(PORTBbits.RB0==0){
+         LATAbits.LA0=1;
+         
+     }else if(PORTBbits.RB0==1){
+         LATAbits.LA0=0;
+     }
+ }
+
+ 
+ unsigned int warning_lamp(){
+ TRISAbits.RA1=0;
+     
+     if(act==ref){
+         LATAbits.LA1=1;
+     }
+ }
+ 
+ 
+ 
+void main(){
+    
+   sysinit();
+   caninit();
+   CC();
+rec_speed();
+//ref_speed_write(msg,0xF1);
+cantransmit();
+warning_lamp();
+//act_speed_write(msg,addr);
+}
