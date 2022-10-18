@@ -1,0 +1,190 @@
+/*
+ * File:   cc.c
+ * Author: admin
+ *
+ * Created on October 11, 2022, 11:25 AM
+ */
+
+// PIC18F458 Configuration Bit Settings
+
+// 'C' source line config statements
+
+//configuration of bits
+#include "config.h"
+#define _XTAL_FREQ 20000000     //setting 20MHZ frequency for crystal
+#define ENABLE 1
+#define DISABLE 0
+//declarations 
+unsigned int data;
+unsigned int ref,act;
+unsigned int addr;
+unsigned int msg;
+unsigned int can_read_msg[10];
+
+
+//unsigned int write(unsigned int, unsigned int);
+//unsigned int read(unsigned int);
+
+
+//system initialization
+void sysinit() {
+    INTCONbits.GIE = ENABLE;
+    INTCONbits.PEIE = ENABLE;
+}
+
+
+//CAN Initialization
+void caninit(){
+   TRISBbits.RB2 = DISABLE; //RB2 is for transmit
+    TRISBbits.RB3 = ENABLE; //RB3 is for receive
+     
+    CANCON |= 0x80;
+    
+    while (CANSTAT!=0x00) {
+        BRGCON1 = 0xC1;
+        BRGCON2 = 0xAE;
+        BRGCON3 = 0x45;
+        CIOCON = 0x02;
+        CANCON = 0x00;  
+    }
+}
+
+
+
+
+
+
+
+void actref_write(unsigned int data, unsigned int addr){
+    
+    EEDATA =data;
+    EEADR =addr;
+    EECON1bits.EEPGD=DISABLE;
+    EECON1bits.CFGS=DISABLE;
+    EECON1bits.WREN=ENABLE;
+    INTCONbits.GIE=DISABLE;
+    
+    EECON2=0x55;
+    EECON2=0xAA;
+    EECON1bits.WR=ENABLE;
+    INTCONbits.GIE=ENABLE;
+    
+    while(PIR2bits.EEIF==0);
+    PIR2bits.EEIF=DISABLE;
+}
+
+unsigned int actref_read(unsigned char addr){
+    EEADR=addr;
+    EECON1bits.EEPGD=DISABLE;
+    EECON1bits.CFGS=DISABLE;
+    EECON1bits.RD=ENABLE;
+    data=EEDATA;
+    return data;
+}
+
+
+
+
+
+
+
+void cantransmit(void) {
+    CANCON = 0x00;
+
+    TXB0SIDH = 0x75;
+    TXB0SIDL = 0x00;
+    TXB0DLC = 0x01;
+
+    TXB0D0 = ref;
+//    TXB0D1 = 0x02;
+//    TXB0D2 = 0x03;
+//    TXB0D3 = 0x04;
+//    TXB0D4 = 0x05;
+//    TXB0D5 = 0x06;
+//    TXB0D6 = 0x07;
+//    TXB0D7 = 0x08;
+
+    TXB0CONbits.TXREQ = ENABLE;
+}
+
+
+
+
+
+ unsigned int rec_speed(){
+     CANCON = 0x00;
+      
+    RXB0SIDH = 0x75;
+    RXB0SIDL = 0x00;
+    RXB0DLC = 0x01;
+   
+     RXM0SIDH=0x75;
+    RXM0SIDL=0x00;
+    
+     RXF0SIDH=0x75;
+    RXF0SIDL=0x00;
+ 
+    ref =  RXB0D0; 
+    actref_write(ref,0xF1);
+    RXB0CONbits.RXM0 = 0X01;
+LATAbits.LA1=0;
+    return ref;
+}
+
+
+
+
+ 
+ //switches
+ 
+     
+
+ 
+ 
+ void CC(){
+     TRISAbits.RA0=0;
+     TRISBbits.RB0=0;
+     
+     if(PORTBbits.RB0==0){
+         LATAbits.LA0=1;
+         act=0x89;
+         actref_write(act,0XF2);
+     }
+     else if(PORTBbits.RB0==1){
+         LATAbits.LA0=0;
+     }
+ }
+
+ 
+ 
+ 
+ 
+ unsigned int warning_lamp(){
+ TRISAbits.RA1=0;
+     
+     if(actref_read(0xF1) == actref_read(0xF2)){
+         LATAbits.LA1=1;
+         __delay_ms(1000);
+     }
+     else if(actref_read(0xF1) < actref_read(0xF2)){
+         LATAbits.LA1=0;
+         
+     }
+     else if(actref_read(0xF1)> actref_read(0xF2)){
+         LATAbits.LA1=1;
+         __delay_ms(600);
+     }
+ }
+ 
+ 
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+ 
+ 
+void main(){ 
+sysinit();
+caninit();
+CC();
+rec_speed();
+warning_lamp();
+cantransmit();
+}
